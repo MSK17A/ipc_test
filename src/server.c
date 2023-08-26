@@ -25,7 +25,7 @@ int main() {
 
   // Configure server address
   server_addr.sun_family = AF_UNIX;
-  strcpy(server_addr.sun_path, "../unix_socket");
+  strcpy(server_addr.sun_path, "unix_socket");
 
   // Binding the socket
   if (bind(server_socket, (struct sockaddr *)&server_addr,
@@ -38,19 +38,31 @@ int main() {
   listen(server_socket, 5);
   printf("Server listening!!!");
 
+  int clen = sizeof(client_addr);
+  client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &clen);
+
   while (1) {
-    int clen = sizeof(client_addr);
-    client_socket =
-        accept(server_socket, (struct sockaddr *)&client_addr, &clen);
     // read(client_socket, read_buffer, sizeof(read_buffer));
-    recv(client_socket, read_buffer, sizeof(read_buffer), 0);
+    // Recieve from client, if not recieved then close the socket.
+    if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
+      close(client_socket);
+      break;
+    };
     printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
            client_socket);
     // write(client_socket, read_buffer, 1);
-    send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0);
-    close(client_socket);
+    // Send to the client, if error occured then close the socket.
+    if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
+      close(client_socket);
+      break;
+    };
+    if (strcmp(read_buffer, "q") == 0) {
+      close(client_socket);
+      break;
+    }
+    memset(read_buffer, 0, 100);
   }
-
+  close(server_socket);
   exit(0);
   return 0;
 }
