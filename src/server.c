@@ -9,12 +9,13 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+int handle_connection(int client_socket);
+
 int main() {
   int server_socket;
   int client_socket;
   struct sockaddr_un server_addr;
   struct sockaddr_un client_addr;
-  char read_buffer[100];
 
   // Socket creation
   server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -42,27 +43,35 @@ int main() {
   client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &clen);
 
   while (1) {
-    // read(client_socket, read_buffer, sizeof(read_buffer));
-    // Recieve from client, if not recieved then close the socket.
-    if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
-      close(client_socket);
-      break;
-    };
-    printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
-           client_socket);
-    // write(client_socket, read_buffer, 1);
-    // Send to the client, if error occured then close the socket.
-    if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
-      close(client_socket);
-      break;
-    };
-    if (strcmp(read_buffer, "q") == 0) {
-      close(client_socket);
+    if (handle_connection(client_socket) == -1) {
       break;
     }
-    memset(read_buffer, 0, 100);
   }
   close(server_socket);
   exit(0);
   return 0;
+}
+
+int handle_connection(int client_socket) {
+  char read_buffer[100];
+  // read(client_socket, read_buffer, sizeof(read_buffer));
+  // Recieve from client, if not recieved then close the socket.
+  if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
+    close(client_socket);
+    return -1;
+  };
+  printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
+         client_socket);
+  // write(client_socket, read_buffer, 1);
+  // Send to the client, if error occured then close the socket.
+  if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
+    close(client_socket);
+    return -1;
+  };
+  if (strcmp(read_buffer, "q") == 0) {
+    close(client_socket);
+    return -1;
+  }
+  return 1;
+  memset(read_buffer, 0, 100);
 }
