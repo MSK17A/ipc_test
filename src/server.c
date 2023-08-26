@@ -56,6 +56,8 @@ int main() {
     timeOut.tv_usec = 0;
 
     fdNum = select(fd_max + 1, &FDs_copy, 0, 0, &timeOut);
+    /* Select will search for any change in file descriptors, it will detect
+     * incoming connections */
     if (fdNum == -1) {
       perror("Select");
       break;
