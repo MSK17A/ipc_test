@@ -10,6 +10,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+void handle_connection(int client_socket);
+
 int main() {
   int server_socket;
   int client_socket;
@@ -45,31 +47,24 @@ int main() {
   FD_SET(server_socket, &current_sockets);
 
   while (1) {
-    // Because select is destructive
-    ready_sockets = current_sockets;
-    if (select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL) < 0) {
-      perror("Select");
-      exit(EXIT_FAILURE);
-    }
-
-    // Loop through all ready sockets
-    for (int i = 0; FD_SETSIZE; i++) {
-      // if file descriptor is set means i is the file ready ot be read.
-      if (FD_ISSET(i, &ready_sockets)) {
-        if (i == server_socket) {
-          // new connection
-          client_socket =
-              accept(i, (struct sockaddr *)&client_addr, sizeof(client_addr));
-
-          // add this socket to the current sockets
-          FD_SET(client_socket, &current_sockets);
-        } else {
-          // do whatever with the connection
-          handle_connection(i);
-        }
-      }
-    }
   }
-  exit(0);
-  return 0;
+  return EXIT_SUCCESS;
+}
+
+void handle_connection(int client_socket) {
+  char read_buffer[100];
+  if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
+    close(client_socket);
+  };
+  printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
+         client_socket);
+  // write(client_socket, read_buffer, 1);
+  // Send to the client, if error occured then close the socket.
+  /*if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
+    close(client_socket);
+  };
+  if (strcmp(read_buffer, "q") == 0) {
+    close(client_socket);
+  }*/
+  memset(read_buffer, 0, 100);
 }
