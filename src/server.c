@@ -12,7 +12,7 @@
 
 int main() {
   int server_socket;
-  // int client_socket;
+  int client_socket;
   struct sockaddr_un server_addr;
   struct sockaddr_un client_addr;
   char read_buffer[100];
@@ -39,7 +39,36 @@ int main() {
   listen(server_socket, 5);
   printf("Server listening!!!");
 
+  fd_set current_sockets, ready_sockets;
+
+  FD_ZERO(&current_sockets);
+  FD_SET(server_socket, &current_sockets);
+
   while (1) {
+    // Because select is destructive
+    ready_sockets = current_sockets;
+    if (select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL) < 0) {
+      perror("Select");
+      exit(EXIT_FAILURE);
+    }
+
+    // Loop through all ready sockets
+    for (int i = 0; FD_SETSIZE; i++) {
+      // if file descriptor is set means i is the file ready ot be read.
+      if (FD_ISSET(i, &ready_sockets)) {
+        if (i == server_socket) {
+          // new connection
+          client_socket =
+              accept(i, (struct sockaddr *)&client_addr, sizeof(client_addr));
+
+          // add this socket to the current sockets
+          FD_SET(client_socket, &current_sockets);
+        } else {
+          // do whatever with the connection
+          handle_connection(i);
+        }
+      }
+    }
   }
   exit(0);
   return 0;
