@@ -58,7 +58,7 @@ int main() {
     fdNum = select(fd_max + 1, &FDs_copy, 0, 0, &timeOut);
     if (fdNum == -1) {
       perror("Select");
-      exit(EXIT_FAILURE);
+      break;
     } else if (fdNum == 0) {
       continue;
     } else {
@@ -66,25 +66,32 @@ int main() {
         if (FD_ISSET(i, &FDs_copy)) {
           if (i == server_socket) {
             // new connection
+            int clen = sizeof(client_addr);
             client_socket =
-                accept(i, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                accept(server_socket, (struct sockaddr *)&client_addr, &clen);
             FD_SET(client_socket, &FDs);
             if (client_socket == -1) {
               perror("Accept");
-              exit(EXIT_FAILURE);
+              continue;
             } else if (fd_max < client_socket) {
               fd_max = client_socket;
             } else {
               // code
             }
-            printf("Client id: %d is connected!", client_socket);
+            fprintf(stdout, "\nClient id: %d is connected!", client_socket);
           } else {
-            handle_connection(i);
+            if (handle_connection(i) == -1) {
+              // Remove the file desciptor from the array of FDs!
+              FD_CLR(i, &FDs);
+              close(i);
+              fprintf(stdout, "\nClient id: %d disconnected!", client_socket);
+            }
           }
         }
       }
     }
   }
+  close(server_socket);
   return EXIT_SUCCESS;
 }
 
@@ -93,7 +100,6 @@ int handle_connection(int client_socket) {
   // read(client_socket, read_buffer, sizeof(read_buffer));
   // Recieve from client, if not recieved then close the socket.
   if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
-    close(client_socket);
     return -1;
   };
   printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
@@ -101,11 +107,9 @@ int handle_connection(int client_socket) {
   // write(client_socket, read_buffer, 1);
   // Send to the client, if error occured then close the socket.
   if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
-    close(client_socket);
     return -1;
   };
   if (strcmp(read_buffer, "q") == 0) {
-    close(client_socket);
     return -1;
   }
   return 1;

@@ -33,12 +33,12 @@ int main() {
     send(server_socket, user_input, strlen(user_input) + 1, 0);
     memset(user_input, 0, 100);
     if (strcmp(user_input, "q") == 0) {
-      close(server_socket);
+      break;
     }
     // read(server_socket, read_buffer, 100);
     recv(server_socket, read_buffer, sizeof(read_buffer) - 1, 0);
     printf("Client: I recieved %s from server!\n", read_buffer);
   }
-
-  exit(0);
+  close(server_socket);
+  return EXIT_SUCCESS;
 }
