@@ -10,7 +10,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-void handle_connection(int client_socket);
+int handle_connection(int client_socket);
 
 int main() {
   int server_socket;
@@ -41,30 +41,73 @@ int main() {
   listen(server_socket, 5);
   printf("Server listening!!!");
 
-  fd_set current_sockets, ready_sockets;
+  // set IO file setting
+  struct timeval timeOut;
+  fd_set FDs, FDs_copy;
 
-  FD_ZERO(&current_sockets);
-  FD_SET(server_socket, &current_sockets);
+  FD_ZERO(&FDs);
+  FD_SET(server_socket, &FDs);
+  int fd_max = server_socket;
+  int fdNum;
 
   while (1) {
+    FDs_copy = FDs;
+    timeOut.tv_sec = 5;
+    timeOut.tv_usec = 0;
+
+    fdNum = select(fd_max + 1, &FDs_copy, 0, 0, &timeOut);
+    if (fdNum == -1) {
+      perror("Select");
+      exit(EXIT_FAILURE);
+    } else if (fdNum == 0) {
+      continue;
+    } else {
+      for (int i = 0; i < fd_max + 1; i++) {
+        if (FD_ISSET(i, &FDs_copy)) {
+          if (i == server_socket) {
+            // new connection
+            client_socket =
+                accept(i, (struct sockaddr *)&client_addr, sizeof(client_addr));
+            FD_SET(client_socket, &FDs);
+            if (client_socket == -1) {
+              perror("Accept");
+              exit(EXIT_FAILURE);
+            } else if (fd_max < client_socket) {
+              fd_max = client_socket;
+            } else {
+              // code
+            }
+            printf("Client id: %d is connected!", client_socket);
+          } else {
+            handle_connection(i);
+          }
+        }
+      }
+    }
   }
   return EXIT_SUCCESS;
 }
 
-void handle_connection(int client_socket) {
+int handle_connection(int client_socket) {
   char read_buffer[100];
+  // read(client_socket, read_buffer, sizeof(read_buffer));
+  // Recieve from client, if not recieved then close the socket.
   if (recv(client_socket, read_buffer, sizeof(read_buffer), 0) == 0) {
     close(client_socket);
+    return -1;
   };
   printf("\nServer: I recieved %s from client: %d!\n", read_buffer,
          client_socket);
   // write(client_socket, read_buffer, 1);
   // Send to the client, if error occured then close the socket.
-  /*if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
+  if (send(client_socket, read_buffer, sizeof(read_buffer) - 1, 0) == -1) {
     close(client_socket);
+    return -1;
   };
   if (strcmp(read_buffer, "q") == 0) {
     close(client_socket);
-  }*/
+    return -1;
+  }
+  return 1;
   memset(read_buffer, 0, 100);
 }
