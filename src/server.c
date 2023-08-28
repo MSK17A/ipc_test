@@ -92,6 +92,7 @@ int main() {
             }
             fprintf(stdout, "\nClient id: %d is connected!", client_socket);
           } else {
+            /* this is a client asking, handle the connection of this socket */
             if (handle_connection(i) == -1) {
               // Remove the file desciptor from the array of FDs!
               FD_CLR(i, &FDs);
