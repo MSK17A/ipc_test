@@ -51,7 +51,10 @@ int main() {
   int fdNum;
 
   while (1) {
+    /* Make a copy of the file descriptors (because select function is
+     * desctructive) */
     FDs_copy = FDs;
+    /* Set timeout for waiting for change in the select function */
     timeOut.tv_sec = 5;
     timeOut.tv_usec = 0;
 
@@ -59,23 +62,30 @@ int main() {
     /* Select will search for any change in file descriptors, it will detect
      * incoming connections */
     if (fdNum == -1) {
+      /* error occured */
       perror("Select");
       break;
     } else if (fdNum == 0) {
+      /* No change, skip below code and continue */
       continue;
     } else {
+      /* if FD num is not 0 then check all file descriptors for ISSET */
       for (int i = 0; i < fd_max + 1; i++) {
         if (FD_ISSET(i, &FDs_copy)) {
           if (i == server_socket) {
-            // new connection
+            // new connection when the file descriptor is the sane as
+            // server_socket fd
             int clen = sizeof(client_addr);
             client_socket =
                 accept(server_socket, (struct sockaddr *)&client_addr, &clen);
+            /* Set the new client socket */
             FD_SET(client_socket, &FDs);
             if (client_socket == -1) {
               perror("Accept");
               continue;
             } else if (fd_max < client_socket) {
+              /* update the maximum number of the file descriptors to account
+               * the new client connections */
               fd_max = client_socket;
             } else {
               // code
