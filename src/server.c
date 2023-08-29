@@ -14,23 +14,23 @@
 int handle_connection(int client_socket);
 
 int main() {
-  Connection *connection = malloc(sizeof(Connection));
+  IOsocket *io_socket = malloc(sizeof(IOsocket));
 
-  create_socket(connection);
-  configure_unix_server_address(connection);
-  binding_socket(connection);
-  start_listening(connection);
-  set_file_IO_settings(connection);
+  create_socket(io_socket);
+  configure_unix_server_address(io_socket);
+  binding_socket(io_socket);
+  start_listening(io_socket);
+  set_file_IO_settings(io_socket);
 
   while (1) {
-    if (search_for_new_connections_and_handle(connection, handle_connection) ==
+    if (search_for_new_connections_and_handle(io_socket, handle_connection) ==
         -1) {
       exit(EXIT_FAILURE);
     }
   }
 
-  close(connection->server_socket);
-  free(connection);
+  close(io_socket->server_socket);
+  free(io_socket);
 
   return EXIT_SUCCESS;
 }

@@ -16,101 +16,99 @@ typedef struct {
   fd_set FDs, FDs_copy;
   int fd_max, fd_Num;
 
-} Connection;
+} IOsocket;
 
-void create_socket(Connection *connection) {
+void create_socket(IOsocket *iosocket) {
   // Socket creation
-  connection->server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (connection->server_socket == -1) {
+  iosocket->server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (iosocket->server_socket == -1) {
     perror("Socket");
     exit(EXIT_FAILURE);
   }
 }
 
-void configure_unix_server_address(Connection *connection) {
+void configure_unix_server_address(IOsocket *iosocket) {
   // Configure server address
-  connection->server_addr.sun_family = AF_UNIX;
-  strcpy(connection->server_addr.sun_path, "unix_socket");
+  iosocket->server_addr.sun_family = AF_UNIX;
+  strcpy(iosocket->server_addr.sun_path, "unix_socket");
 }
 
-void binding_socket(Connection *connection) {
+void binding_socket(IOsocket *iosocket) {
   // Binding the socket
-  if (bind(connection->server_socket,
-           (struct sockaddr *)&(connection->server_addr),
-           sizeof(connection->server_addr)) == -1) {
+  if (bind(iosocket->server_socket, (struct sockaddr *)&(iosocket->server_addr),
+           sizeof(iosocket->server_addr)) == -1) {
     perror("Bind");
     exit(EXIT_FAILURE);
   }
 }
-void start_listening(Connection *connection) {
+void start_listening(IOsocket *iosocket) {
   // Start listening
-  listen(connection->server_socket, 5);
+  listen(iosocket->server_socket, 5);
   puts("Server listening!!!");
 }
 
-void set_file_IO_settings(Connection *connection) {
-  FD_ZERO(&connection->FDs);
-  FD_SET(connection->server_socket, &connection->FDs);
-  connection->fd_max = connection->server_socket;
+void set_file_IO_settings(IOsocket *iosocket) {
+  FD_ZERO(&iosocket->FDs);
+  FD_SET(iosocket->server_socket, &iosocket->FDs);
+  iosocket->fd_max = iosocket->server_socket;
 }
 
-void set_timeout(Connection *connection, int timeOut_sec) {
+void set_timeout(IOsocket *iosocket, int timeOut_sec) {
   /* Set timeout for waiting for change in the select function */
-  connection->timeOut.tv_sec = timeOut_sec;
-  connection->timeOut.tv_usec = 0;
+  iosocket->timeOut.tv_sec = timeOut_sec;
+  iosocket->timeOut.tv_usec = 0;
 }
 
-void check_for_fd_updates(Connection *connection) {
+void check_for_fd_updates(IOsocket *iosocket) {
   /* Make a copy of the file descriptors (because select function is
    * desctructive) */
-  connection->FDs_copy = connection->FDs;
+  iosocket->FDs_copy = iosocket->FDs;
   /* Select will search for any change in file descriptors, it will detect
-   * incoming connections */
-  connection->fd_Num = select(connection->fd_max + 1, &connection->FDs_copy, 0,
-                              0, &connection->timeOut);
+   * incoming IOsockets */
+  iosocket->fd_Num = select(iosocket->fd_max + 1, &iosocket->FDs_copy, 0, 0,
+                            &iosocket->timeOut);
 }
 
-int search_for_new_connections_and_handle(Connection *connection,
-                                          int (*ptr)(int)) {
-  set_timeout(connection, 5);
+int search_for_new_connections_and_handle(IOsocket *iosocket, int (*ptr)(int)) {
+  set_timeout(iosocket, 5);
 
-  check_for_fd_updates(connection);
-  if (connection->fd_Num == -1) {
+  check_for_fd_updates(iosocket);
+  if (iosocket->fd_Num == -1) {
     /* error occured */
     perror("Select");
     return -1;
-  } else if (connection->fd_Num == 0) {
+  } else if (iosocket->fd_Num == 0) {
     /* No change, skip below code and continue */
     return 0;
   } else {
     /* if FD num is not 0 then check all file descriptors for ISSET */
-    for (int i = 0; i < connection->fd_max + 1; i++) {
-      if (FD_ISSET(i, &connection->FDs_copy)) {
-        if (i == connection->server_socket) {
-          // new connection when the file descriptor is the sane as
+    for (int i = 0; i < iosocket->fd_max + 1; i++) {
+      if (FD_ISSET(i, &iosocket->FDs_copy)) {
+        if (i == iosocket->server_socket) {
+          // new IOsocket when the file descriptor is the sane as
           // server_socket fd
-          uint32_t clen = sizeof(connection->client_addr);
+          uint32_t clen = sizeof(iosocket->client_addr);
           int client_socket =
-              accept(connection->server_socket,
-                     (struct sockaddr *)&connection->client_addr, &clen);
+              accept(iosocket->server_socket,
+                     (struct sockaddr *)&iosocket->client_addr, &clen);
           /* Set the new client socket */
-          FD_SET(client_socket, &connection->FDs);
+          FD_SET(client_socket, &iosocket->FDs);
           if (client_socket == -1) {
             perror("Accept");
             continue;
-          } else if (connection->fd_max < client_socket) {
+          } else if (iosocket->fd_max < client_socket) {
             /* update the maximum number of the file descriptors to account
-             * the new client connections */
-            connection->fd_max = client_socket;
+             * the new client IOsockets */
+            iosocket->fd_max = client_socket;
           } else {
             // code
           }
           printf("Client id: %d is connected!\n", client_socket);
         } else {
-          /* this is a client asking, handle the connection of this socket */
+          /* this is a client asking, handle the IOsocket of this socket */
           if ((*ptr)(i) == -1) {
             // Remove the file desciptor from the array of FDs!
-            FD_CLR(i, &connection->FDs);
+            FD_CLR(i, &iosocket->FDs);
             close(i);
             printf("\nClient id: %d disconnected!\n", i);
           }
