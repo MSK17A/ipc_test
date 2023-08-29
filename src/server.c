@@ -13,10 +13,10 @@
 typedef struct {
   int server_socket;
   struct sockaddr_un server_addr;
-  struct sockaddr_un *client_addr;
+  struct sockaddr_un client_addr;
   // set IO file setting
   struct timeval timeOut;
-  fd_set *FDs, FDs_copy;
+  fd_set FDs, FDs_copy;
   int fd_max, fd_Num;
 
 } Connection;
@@ -51,87 +51,61 @@ void start_listening(Connection *connection) {
 }
 
 void set_file_IO_settings(Connection *connection) {
-  FD_ZERO(connection->FDs);
-  FD_SET(connection->server_socket, connection->FDs);
+  FD_ZERO(&connection->FDs);
+  FD_SET(connection->server_socket, &connection->FDs);
   connection->fd_max = connection->server_socket;
 }
-
 
 int handle_connection(int client_socket);
 
 int main() {
-  int server_socket;
-  int client_socket;
-  struct sockaddr_un server_addr;
-  struct sockaddr_un client_addr;
+  Connection *connection = malloc(sizeof(Connection));
 
-  // Socket creation
-  server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (server_socket == -1) {
-    perror("Socket");
-    exit(EXIT_FAILURE);
-  }
-
-  // Configure server address
-  server_addr.sun_family = AF_UNIX;
-  strcpy(server_addr.sun_path, "unix_socket");
-
-  // Binding the socket
-  if (bind(server_socket, (struct sockaddr *)&server_addr,
-           sizeof(server_addr)) == -1) {
-    perror("Bind");
-    exit(EXIT_FAILURE);
-  }
-
-  // Start listening
-  listen(server_socket, 5);
-  puts("Server listening!!!");
-  // set IO file setting
-  struct timeval timeOut;
-  fd_set FDs, FDs_copy;
-
-  FD_ZERO(&FDs);
-  FD_SET(server_socket, &FDs);
-  int fd_max = server_socket;
-  int fdNum;
+  create_socket(connection);
+  configure_unix_server_address(connection);
+  binding_socket(connection);
+  start_listening(connection);
+  set_file_IO_settings(connection);
 
   while (1) {
     /* Make a copy of the file descriptors (because select function is
      * desctructive) */
-    FDs_copy = FDs;
+    connection->FDs_copy = connection->FDs;
     /* Set timeout for waiting for change in the select function */
-    timeOut.tv_sec = 5;
-    timeOut.tv_usec = 0;
+    connection->timeOut.tv_sec = 5;
+    connection->timeOut.tv_usec = 0;
 
-    fdNum = select(fd_max + 1, &FDs_copy, 0, 0, &timeOut);
+    connection->fd_Num = select(connection->fd_max + 1, &connection->FDs_copy,
+                                0, 0, &connection->timeOut);
     /* Select will search for any change in file descriptors, it will detect
      * incoming connections */
-    if (fdNum == -1) {
+    if (connection->fd_Num == -1) {
       /* error occured */
       perror("Select");
       break;
-    } else if (fdNum == 0) {
+    } else if (connection->fd_Num == 0) {
       /* No change, skip below code and continue */
       continue;
     } else {
       /* if FD num is not 0 then check all file descriptors for ISSET */
-      for (int i = 0; i < fd_max + 1; i++) {
-        if (FD_ISSET(i, &FDs_copy)) {
-          if (i == server_socket) {
+      for (int i = 0; i < connection->fd_max + 1; i++) {
+        if (FD_ISSET(i, &connection->FDs_copy)) {
+          if (i == connection->server_socket) {
             // new connection when the file descriptor is the sane as
             // server_socket fd
-            uint32_t clen = sizeof(client_addr);
-            client_socket =
-                accept(server_socket, (struct sockaddr *)&client_addr, &clen);
+            uint32_t clen = sizeof(connection->client_addr);
+            int client_socket =
+                accept(connection->server_socket,
+                       (struct sockaddr *)&connection->client_addr, &clen);
             /* Set the new client socket */
-            FD_SET(client_socket, &FDs);
+            FD_SET(client_socket, &connection->FDs);
             if (client_socket == -1) {
               perror("Accept");
               continue;
-            } else if (fd_max < client_socket) {
+            } else if (connection->fd_max < client_socket) {
               /* update the maximum number of the file descriptors to account
                * the new client connections */
-              fd_max = client_socket;
+              connection->fd_max = client_socket;
             } else {
               // code
             }
@@ -140,16 +114,16 @@ int main() {
             /* this is a client asking, handle the connection of this socket */
             if (handle_connection(i) == -1) {
               // Remove the file desciptor from the array of FDs!
-              FD_CLR(i, &FDs);
+              FD_CLR(i, &connection->FDs);
               close(i);
-              printf("\nClient id: %d disconnected!\n", client_socket);
+              printf("\nClient id: %d disconnected!\n", i);
             }
           }
         }
       }
     }
   }
-  close(server_socket);
+  close(connection->server_socket);
   return EXIT_SUCCESS;
 }
 
