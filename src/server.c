@@ -10,6 +10,53 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+typedef struct {
+  int server_socket;
+  struct sockaddr_un server_addr;
+  struct sockaddr_un *client_addr;
+  // set IO file setting
+  struct timeval timeOut;
+  fd_set *FDs, FDs_copy;
+  int fd_max, fd_Num;
+
+} Connection;
+
+void create_socket(Connection *connection) {
+  // Socket creation
+  connection->server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (connection->server_socket == -1) {
+    perror("Socket");
+    exit(EXIT_FAILURE);
+  }
+}
+void configure_unix_server_address(Connection *connection) {
+  // Configure server address
+  connection->server_addr.sun_family = AF_UNIX;
+  strcpy(connection->server_addr.sun_path, "unix_socket");
+}
+
+void binding_socket(Connection *connection) {
+  // Binding the socket
+  if (bind(connection->server_socket,
+           (struct sockaddr *)&(connection->server_addr),
+           sizeof(connection->server_addr)) == -1) {
+    perror("Bind");
+    exit(EXIT_FAILURE);
+  }
+}
+void start_listening(Connection *connection) {
+  // Start listening
+  listen(connection->server_socket, 5);
+  puts("Server listening!!!");
+}
+
+void set_file_IO_settings(Connection *connection) {
+  FD_ZERO(connection->FDs);
+  FD_SET(connection->server_socket, connection->FDs);
+  connection->fd_max = connection->server_socket;
+}
+
+
 int handle_connection(int client_socket);
 
 int main() {
@@ -17,7 +64,6 @@ int main() {
   int client_socket;
   struct sockaddr_un server_addr;
   struct sockaddr_un client_addr;
-  char read_buffer[100];
 
   // Socket creation
   server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -39,8 +85,7 @@ int main() {
 
   // Start listening
   listen(server_socket, 5);
-  printf("Server listening!!!");
-
+  puts("Server listening!!!");
   // set IO file setting
   struct timeval timeOut;
   fd_set FDs, FDs_copy;
@@ -75,7 +120,7 @@ int main() {
           if (i == server_socket) {
             // new connection when the file descriptor is the sane as
             // server_socket fd
-            int clen = sizeof(client_addr);
+            uint32_t clen = sizeof(client_addr);
             client_socket =
                 accept(server_socket, (struct sockaddr *)&client_addr, &clen);
             /* Set the new client socket */
@@ -90,14 +135,14 @@ int main() {
             } else {
               // code
             }
-            fprintf(stdout, "\nClient id: %d is connected!", client_socket);
+            printf("Client id: %d is connected!\n", client_socket);
           } else {
             /* this is a client asking, handle the connection of this socket */
             if (handle_connection(i) == -1) {
               // Remove the file desciptor from the array of FDs!
               FD_CLR(i, &FDs);
               close(i);
-              fprintf(stdout, "\nClient id: %d disconnected!", client_socket);
+              printf("\nClient id: %d disconnected!\n", client_socket);
             }
           }
         }

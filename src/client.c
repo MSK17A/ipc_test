@@ -33,6 +33,7 @@ int main() {
     send(server_socket, user_input, strlen(user_input) + 1, 0);
     memset(user_input, 0, 100);
     if (strcmp(user_input, "q") == 0) {
+      fflush(stdout);
       break;
     }
     // read(server_socket, read_buffer, 100);
