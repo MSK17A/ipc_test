@@ -30,6 +30,8 @@ int main() {
   }
 
   close(connection->server_socket);
+  free(connection);
+
   return EXIT_SUCCESS;
 }
 
